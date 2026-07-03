@@ -228,8 +228,14 @@ export async function syncWhoop(days = 14): Promise<{ recovery: number; sleep: n
     });
 
   const upsert = async (tbl: string, rows: Record<string, unknown>[]) => {
-    if (rows.length === 0) return;
-    const { error } = await db.from(tbl).upsert(rows, { onConflict: "id" });
+    // De-dupe by id (last wins): after timezone shifting, two WHOOP cycles can
+    // map to the same local day, and a batch with duplicate ids makes Postgres
+    // reject the whole upsert ("cannot affect row a second time").
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const r of rows) byId.set(String(r.id), r);
+    const deduped = [...byId.values()];
+    if (deduped.length === 0) return;
+    const { error } = await db.from(tbl).upsert(deduped, { onConflict: "id" });
     if (error) throw new Error(`${tbl}: ${error.message}`);
   };
   await upsert("whoop_recovery", recRows);

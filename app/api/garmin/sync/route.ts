@@ -12,6 +12,14 @@ interface GC {
   get?: <T>(url: string) => Promise<T>;
 }
 
+// De-dupe rows by id (last wins) so a batch never triggers Postgres's
+// "ON CONFLICT DO UPDATE cannot affect row a second time".
+function dedupe<T extends { id: string }>(rows: T[]): T[] {
+  const byId = new Map<string, T>();
+  for (const r of rows) byId.set(r.id, r);
+  return [...byId.values()];
+}
+
 function friendly(e: unknown): NextResponse {
   const msg = String(e);
   if (/429|too many/i.test(msg)) {
@@ -115,8 +123,9 @@ export async function POST(req: NextRequest) {
     })
     .filter((r) => r.date && r.distance_km > 0);
 
-  if (runs.length > 0) {
-    const { error } = await db.from("garmin_runs").upsert(runs, { onConflict: "id" });
+  const runRows = dedupe(runs);
+  if (runRows.length > 0) {
+    const { error } = await db.from("garmin_runs").upsert(runRows, { onConflict: "id" });
     if (error) return NextResponse.json({ error: `garmin_runs: ${error.message}` }, { status: 500 });
   }
 
@@ -140,9 +149,10 @@ export async function POST(req: NextRequest) {
         notes: `Garmin · ${r.distance_km} km`,
         source_run_id: r.id,
       }));
-    if (mirrorRows.length > 0) {
-      const { error } = await db.from("workouts").upsert(mirrorRows, { onConflict: "id" });
-      if (!error) mirrored = mirrorRows.length;
+    const mirrorDeduped = dedupe(mirrorRows);
+    if (mirrorDeduped.length > 0) {
+      const { error } = await db.from("workouts").upsert(mirrorDeduped, { onConflict: "id" });
+      if (!error) mirrored = mirrorDeduped.length;
     }
   } catch { /* best-effort */ }
 
@@ -177,10 +187,11 @@ export async function POST(req: NextRequest) {
         });
       }
     }
-    if (rows.length > 0) {
-      const { error } = await db.from("workouts").upsert(rows, { onConflict: "id" });
+    const plannedRows = dedupe(rows as { id: string }[]);
+    if (plannedRows.length > 0) {
+      const { error } = await db.from("workouts").upsert(plannedRows, { onConflict: "id" });
       if (error) throw new Error(error.message);
-      planned = rows.length;
+      planned = plannedRows.length;
     }
   } catch (e) {
     calendarNote = `coach calendar not available: ${String(e).slice(0, 120)}`;
