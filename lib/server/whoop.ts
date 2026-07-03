@@ -105,16 +105,43 @@ async function paged(path: string, token: string, start: string): Promise<Record
 const day = (iso: string) => iso.slice(0, 10);
 const ms2h = (ms: number) => Math.round((ms / 3_600_000) * 100) / 100;
 
-export async function syncWhoop(days = 14): Promise<{ recovery: number; sleep: number; strain: number }> {
+// WHOOP timestamps are UTC; records carry a timezone_offset like "+03:00".
+// Shift before taking the calendar date, or evening/overnight records land
+// on the wrong day (e.g. Istanbul strain filed under "yesterday").
+function localDay(iso: string, offset?: string): string {
+  if (!offset || !/^[+-]\d{2}:\d{2}$/.test(offset)) return day(iso);
+  const sign = offset[0] === "-" ? -1 : 1;
+  const [h, m] = offset.slice(1).split(":").map(Number);
+  return new Date(new Date(iso).getTime() + sign * (h * 60 + m) * 60_000).toISOString().slice(0, 10);
+}
+
+const SPORT_TYPE: [RegExp, string][] = [
+  [/run|jog|track/i, "run"],
+  [/weight|lift|strength|power|functional|cross/i, "full"],
+  [/yoga|pilates|stretch|mobility|meditat/i, "mobility"],
+];
+
+function sportToWorkoutType(sport: string): string {
+  for (const [re, t] of SPORT_TYPE) if (re.test(sport)) return t;
+  return "other";
+}
+
+function prettySport(sport: string): string {
+  const s = sport.replace(/[_-]+/g, " ").trim();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+export async function syncWhoop(days = 14): Promise<{ recovery: number; sleep: number; strain: number; workouts: number }> {
   const db = supabaseAdmin();
   if (!db) throw new Error("supabase not configured");
   const token = await freshAccessToken();
   const start = new Date(Date.now() - days * 86_400_000).toISOString();
 
-  const [recoveries, sleeps, cycles] = await Promise.all([
+  const [recoveries, sleeps, cycles, whoopWorkouts] = await Promise.all([
     paged("/recovery", token, start),
     paged("/activity/sleep", token, start),
     paged("/cycle", token, start),
+    paged("/activity/workout", token, start),
   ]);
 
   const recRows = recoveries
@@ -136,7 +163,7 @@ export async function syncWhoop(days = 14): Promise<{ recovery: number; sleep: n
     .filter((s) => !(s as { nap?: boolean }).nap && (s as { score?: unknown }).score)
     .map((s) => {
       const sl = s as {
-        start: string; end: string;
+        start: string; end: string; timezone_offset?: string;
         score: {
           stage_summary: { total_in_bed_time_milli: number; total_awake_time_milli: number; total_light_sleep_time_milli: number; total_slow_wave_sleep_time_milli: number; total_rem_sleep_time_milli: number };
           sleep_needed: { baseline_milli: number };
@@ -145,9 +172,10 @@ export async function syncWhoop(days = 14): Promise<{ recovery: number; sleep: n
       };
       const st = sl.score.stage_summary;
       const asleep = st.total_light_sleep_time_milli + st.total_slow_wave_sleep_time_milli + st.total_rem_sleep_time_milli;
+      const d = localDay(sl.end, sl.timezone_offset);
       return {
-        id: `whoop-sleep-${day(sl.end)}`,
-        date: day(sl.end),
+        id: `whoop-sleep-${d}`,
+        date: d,
         hours: ms2h(asleep),
         need_hours: ms2h(sl.score.sleep_needed.baseline_milli),
         performance_pct: Math.round(sl.score.sleep_performance_percentage ?? 0),
@@ -164,14 +192,38 @@ export async function syncWhoop(days = 14): Promise<{ recovery: number; sleep: n
   const strainRows = cycles
     .filter((cy) => (cy as { score?: unknown }).score)
     .map((cy) => {
-      const cyc = cy as { start: string; score: { strain: number; kilojoule: number; average_heart_rate: number; max_heart_rate: number } };
+      const cyc = cy as { start: string; timezone_offset?: string; score: { strain: number; kilojoule: number; average_heart_rate: number; max_heart_rate: number } };
+      const d = localDay(cyc.start, cyc.timezone_offset);
       return {
-        id: `whoop-strain-${day(cyc.start)}`,
-        date: day(cyc.start),
+        id: `whoop-strain-${d}`,
+        date: d,
         strain: Math.round(cyc.score.strain * 10) / 10,
         calories: Math.round(cyc.score.kilojoule / 4.184),
         avg_hr: Math.round(cyc.score.average_heart_rate),
         max_hr: Math.round(cyc.score.max_heart_rate),
+      };
+    });
+
+  // WHOOP-tracked activities (weightlifting, runs, …) land on the training
+  // calendar as completed sessions.
+  const workoutRows = whoopWorkouts
+    .filter((w) => (w as { score_state?: string }).score_state === "SCORED")
+    .map((w) => {
+      const wk = w as {
+        id: string; sport_name?: string; start: string; end: string; timezone_offset?: string;
+        score: { strain: number; average_heart_rate: number; max_heart_rate: number; kilojoule: number };
+      };
+      const sport = wk.sport_name ?? "activity";
+      const kcal = Math.round(wk.score.kilojoule / 4.184);
+      return {
+        id: `whoop-wk-${wk.id}`,
+        date: localDay(wk.start, wk.timezone_offset),
+        title: prettySport(sport),
+        type: sportToWorkoutType(sport),
+        status: "completed",
+        exercises: [],
+        duration_min: Math.max(1, Math.round((new Date(wk.end).getTime() - new Date(wk.start).getTime()) / 60_000)),
+        notes: `WHOOP · strain ${wk.score.strain.toFixed(1)} · avg HR ${Math.round(wk.score.average_heart_rate)} · ${kcal} kcal`,
       };
     });
 
@@ -183,5 +235,6 @@ export async function syncWhoop(days = 14): Promise<{ recovery: number; sleep: n
   await upsert("whoop_recovery", recRows);
   await upsert("whoop_sleep", sleepRows);
   await upsert("whoop_strain", strainRows);
-  return { recovery: recRows.length, sleep: sleepRows.length, strain: strainRows.length };
+  await upsert("workouts", workoutRows);
+  return { recovery: recRows.length, sleep: sleepRows.length, strain: strainRows.length, workouts: workoutRows.length };
 }

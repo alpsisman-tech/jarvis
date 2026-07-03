@@ -7,12 +7,12 @@ import { Card, StatTile, Chip, Btn } from "@/components/ui";
 import { Ring, Sparkline } from "@/components/charts";
 import WeatherCard from "@/components/WeatherCard";
 import {
-  getRecovery, getSleep, getStrain, getGarminDaily, getWorkouts,
+  getRecovery, getSleep, getStrain, getWorkouts,
   getNutrition, getHydration, logHydration, getSettings, saveWorkout, getMode,
 } from "@/lib/store";
-import { todayISO, addDays, fmtHours, fmtInt, uid, weekdayShort, fmtShort } from "@/lib/format";
+import { todayISO, addDays, fmtHours, fmtInt, uid, weekdayShort, fmtShort, mondayOf } from "@/lib/format";
 import { exerciseName } from "@/lib/exercises";
-import type { RecoveryDay, SleepDay, StrainDay, GarminDaily, Workout, NutritionLog, HydrationLog } from "@/lib/types";
+import type { RecoveryDay, SleepDay, StrainDay, Workout, NutritionLog, HydrationLog } from "@/lib/types";
 
 function recoveryColor(score: number, c: { good: string; warning: string; critical: string }) {
   return score >= 67 ? c.good : score >= 34 ? c.warning : c.critical;
@@ -23,7 +23,7 @@ export default function TodayPage() {
   const [recovery, setRecovery] = useState<RecoveryDay[]>([]);
   const [sleep, setSleep] = useState<SleepDay[]>([]);
   const [strain, setStrain] = useState<StrainDay[]>([]);
-  const [garmin, setGarmin] = useState<GarminDaily[]>([]);
+  const [weekWorkouts, setWeekWorkouts] = useState<Workout[]>([]);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [nutrition, setNutrition] = useState<NutritionLog[]>([]);
   const [hydration, setHydration] = useState<HydrationLog[]>([]);
@@ -33,12 +33,13 @@ export default function TodayPage() {
   const today = todayISO();
 
   const load = async () => {
-    const [r, s, st, g, w, n, h] = await Promise.all([
-      getRecovery(14), getSleep(14), getStrain(14), getGarminDaily(14),
+    const [r, s, st, ww, w, n, h] = await Promise.all([
+      getRecovery(14), getSleep(14), getStrain(14),
+      getWorkouts(mondayOf(today), today),
       getWorkouts(today, addDays(today, 7)),
       getNutrition(today, today), getHydration(today, today),
     ]);
-    setRecovery(r); setSleep(s); setStrain(st); setGarmin(g);
+    setRecovery(r); setSleep(s); setStrain(st); setWeekWorkouts(ww);
     setWorkouts(w); setNutrition(n); setHydration(h);
     setDemoMode(getMode() === "local");
   };
@@ -47,7 +48,7 @@ export default function TodayPage() {
   const rec = recovery[recovery.length - 1];
   const sl = sleep[sleep.length - 1];
   const st = strain[strain.length - 1];
-  const g = garmin[garmin.length - 1];
+  const doneThisWeek = weekWorkouts.filter((w) => w.status === "completed").length;
   const todayWorkout = workouts.find((w) => w.date === today);
   const upcoming = workouts.filter((w) => w.date > today).slice(0, 6);
 
@@ -106,16 +107,16 @@ export default function TodayPage() {
           spark={<Sparkline data={sleep.map((s) => s.hours)} color={c.series[4]} />}
         />
         <StatTile
-          label="Day strain"
+          label="Day strain (WHOOP)"
           value={st ? st.strain.toFixed(1) : "–"}
-          sub={st ? `${fmtInt(st.calories)} kcal burned` : undefined}
+          sub={st ? `avg HR ${st.avg_hr} · max ${st.max_hr} bpm` : undefined}
           spark={<Sparkline data={strain.map((s) => s.strain)} color={c.series[2]} />}
         />
         <StatTile
-          label="Garmin"
-          value={g ? fmtInt(g.steps) : "–"}
-          sub={g ? `steps · body battery ${g.body_battery} · stress ${g.stress_avg}` : undefined}
-          spark={<Sparkline data={garmin.map((x) => x.steps)} color={c.series[1]} />}
+          label="Burned today"
+          value={st ? `${fmtInt(st.calories)}` : "–"}
+          sub={`kcal · ${doneThisWeek} session${doneThisWeek === 1 ? "" : "s"} this week`}
+          spark={<Sparkline data={strain.map((s) => s.calories)} color={c.series[1]} />}
         />
       </div>
 
