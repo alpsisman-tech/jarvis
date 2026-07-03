@@ -166,10 +166,11 @@ export default function JarvisChat({ tall = false, initialQuery }: { tall?: bool
   }
 
   return (
-    <div style={{
+    <div className={tall ? "chat-tall" : undefined} style={{
       display: "flex", flexDirection: "column",
-      height: tall ? "calc(100dvh - 170px)" : 480, minHeight: 380,
-      background: c.surface, border: `1px solid ${c.border}`, borderRadius: 14, overflow: "hidden",
+      height: tall ? undefined : 480, minHeight: 380,
+      background: c.surface, border: `1px solid ${c.border}`, borderRadius: 18, overflow: "hidden",
+      boxShadow: `0 16px 48px rgba(0,0,0,0.35), 0 0 0 1px ${c.accent}11, 0 0 60px ${c.accent}0d`,
     }}>
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
         {items.length === 0 && (
@@ -235,8 +236,9 @@ export default function JarvisChat({ tall = false, initialQuery }: { tall?: bool
           }}
         />
         <button type="submit" disabled={busy || !input.trim()} style={{
-          background: c.accent, color: "#fff", border: "none", borderRadius: 12,
+          background: `linear-gradient(135deg, ${c.accent}, #1c5cab)`, color: "#fff", border: "none", borderRadius: 12,
           padding: "0 18px", fontSize: 14, fontWeight: 700, cursor: "pointer",
+          boxShadow: busy || !input.trim() ? "none" : `0 4px 16px ${c.accent}55`,
           opacity: busy || !input.trim() ? 0.5 : 1, fontFamily: "inherit",
         }}>
           ➤

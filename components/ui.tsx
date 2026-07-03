@@ -6,15 +6,29 @@ import { useTheme } from "@/lib/theme";
 export function Card({ title, right, children, style }: {
   title?: string; right?: React.ReactNode; children: React.ReactNode; style?: React.CSSProperties;
 }) {
-  const { c } = useTheme();
+  const { c, isDark } = useTheme();
   return (
-    <section style={{
-      background: c.surface, border: `1px solid ${c.border}`, borderRadius: 14,
-      padding: 16, ...style,
+    <section className="card-hover" style={{
+      background: isDark
+        ? `linear-gradient(180deg, rgba(140,180,255,0.045), rgba(140,180,255,0.0) 60%), ${c.surface}`
+        : c.surface,
+      border: `1px solid ${c.border}`, borderRadius: 16,
+      padding: 18,
+      boxShadow: isDark ? "0 12px 32px rgba(0,0,0,0.35)" : "0 8px 24px rgba(20,30,50,0.06)",
+      ...style,
     }}>
       {(title || right) && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          {title && <h2 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: c.text2, letterSpacing: 0.2 }}>{title}</h2>}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 10 }}>
+          {title && (
+            <h2 style={{
+              margin: 0, fontSize: 11.5, fontWeight: 700, color: c.muted,
+              letterSpacing: 1.4, textTransform: "uppercase",
+              display: "flex", alignItems: "center", gap: 8,
+            }}>
+              <span style={{ width: 4, height: 14, borderRadius: 2, background: c.accent, boxShadow: `0 0 8px ${c.accent}66`, flexShrink: 0 }} />
+              {title}
+            </h2>
+          )}
           {right}
         </div>
       )}
@@ -26,15 +40,19 @@ export function Card({ title, right, children, style }: {
 export function StatTile({ label, value, sub, subColor, spark }: {
   label: string; value: string; sub?: string; subColor?: string; spark?: React.ReactNode;
 }) {
-  const { c } = useTheme();
+  const { c, isDark } = useTheme();
   return (
-    <div style={{
-      background: c.surface, border: `1px solid ${c.border}`, borderRadius: 14,
-      padding: "14px 16px", display: "flex", flexDirection: "column", gap: 4, minWidth: 0,
+    <div className="card-hover" style={{
+      background: isDark
+        ? `linear-gradient(180deg, rgba(140,180,255,0.05), rgba(140,180,255,0.0) 70%), ${c.surface}`
+        : c.surface,
+      border: `1px solid ${c.border}`, borderRadius: 16,
+      padding: "15px 17px", display: "flex", flexDirection: "column", gap: 5, minWidth: 0,
+      boxShadow: isDark ? "0 12px 32px rgba(0,0,0,0.3)" : "0 8px 24px rgba(20,30,50,0.05)",
     }}>
-      <div style={{ fontSize: 12, color: c.muted }}>{label}</div>
+      <div style={{ fontSize: 10.5, fontWeight: 700, color: c.muted, letterSpacing: 1.2, textTransform: "uppercase" }}>{label}</div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ fontSize: 26, fontWeight: 700, color: c.text, lineHeight: 1.1 }}>{value}</div>
+        <div style={{ fontSize: 28, fontWeight: 800, color: c.text, lineHeight: 1.05, letterSpacing: -0.5 }}>{value}</div>
         {spark}
       </div>
       {sub && <div style={{ fontSize: 12, color: subColor ?? c.text2 }}>{sub}</div>}
@@ -54,7 +72,11 @@ export function Btn({ children, onClick, variant = "primary", disabled, type, st
     fontFamily: "inherit",
   };
   const variants: Record<string, React.CSSProperties> = {
-    primary: { background: c.accent, color: "#fff" },
+    primary: {
+      background: `linear-gradient(135deg, ${c.accent}, #1c5cab)`,
+      color: "#fff",
+      boxShadow: `0 4px 14px ${c.accent}44`,
+    },
     ghost: { background: "transparent", color: c.text2, border: `1px solid ${c.border}` },
     danger: { background: "transparent", color: c.critical, border: `1px solid ${c.critical}44` },
   };
@@ -103,8 +125,8 @@ export function PageTitle({ title, sub, right }: { title: string; sub?: string; 
   return (
     <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
       <div>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: c.text }}>{title}</h1>
-        {sub && <p style={{ margin: "4px 0 0", fontSize: 13, color: c.muted }}>{sub}</p>}
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: c.text, letterSpacing: -0.4 }}>{title}</h1>
+        {sub && <p style={{ margin: "5px 0 0", fontSize: 13, color: c.muted }}>{sub}</p>}
       </div>
       {right}
     </div>

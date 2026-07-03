@@ -23,10 +23,10 @@ export interface Colors {
 
 // Validated against the dark surface (#101821) — dataviz six-checks pass.
 export const DARK: Colors = {
-  bg: "#0a0e14",
-  surface: "#101821",
-  surface2: "#17212d",
-  border: "rgba(255,255,255,0.10)",
+  bg: "#070b11",
+  surface: "#0f1620",
+  surface2: "#16202c",
+  border: "rgba(140,180,255,0.10)",
   text: "#f2f5f9",
   text2: "#b8c2cf",
   muted: "#8a94a2",
