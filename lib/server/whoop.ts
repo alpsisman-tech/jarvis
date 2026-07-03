@@ -55,7 +55,7 @@ export async function saveTokens(t: TokenSet): Promise<void> {
     { id: "whoop", ...t, updated_at: new Date().toISOString() },
     { onConflict: "id" },
   );
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(`supabase write (integration_tokens): ${error.message} — check NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY and that supabase/schema.sql was run in that project`);
 }
 
 async function freshAccessToken(): Promise<string> {
