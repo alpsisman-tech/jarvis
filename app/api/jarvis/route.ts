@@ -29,6 +29,8 @@ const SERVER_TOOLS = [
   { name: "create_calendar_event", description: "Create an event on the user's Google Calendar — meetings, reminders, dinner reservations, appointments, blocks of time. For a reminder, create a short event at the reminder time (default calendar notifications will fire).", input_schema: { type: "object", properties: { title: { type: "string" }, start: { type: "string", description: "ISO 8601 datetime with timezone, e.g. 2026-07-04T19:30:00+03:00" }, end: { type: "string", description: "ISO end time; omit to use duration_min" }, duration_min: { type: "number", description: "Duration in minutes if no end given (default 60)" }, description: { type: "string" }, location: { type: "string" } }, required: ["title", "start"] } },
   { name: "list_calendar_events", description: "List the user's Google Calendar events between two times (defaults: now → +7 days). Use before scheduling to avoid conflicts.", input_schema: { type: "object", properties: { from: { type: "string", description: "ISO datetime" }, to: { type: "string", description: "ISO datetime" } } } },
   { name: "send_email", description: "Send an email from the user's Gmail — reservation requests, inquiries, follow-ups. ALWAYS show the user the recipient, subject and body and get explicit confirmation before calling this.", input_schema: { type: "object", properties: { to: { type: "string" }, subject: { type: "string" }, body: { type: "string" } }, required: ["to", "subject", "body"] } },
+  { name: "search_emails", description: "Search the user's Gmail with a Gmail query and get matching messages (sender, subject, snippet, date). Use for 'do I have any emails about X', finding receipts/subscriptions, flights, bills, anything. Gmail query syntax: from:, subject:, newer_than:30d, has:attachment, is:unread, category:promotions, etc.", input_schema: { type: "object", properties: { query: { type: "string", description: "Gmail search query" }, max: { type: "number", description: "Max messages (default 20)" } }, required: ["query"] } },
+  { name: "list_important_emails", description: "The user's important/unread mail that likely needs attention (last ~2 weeks).", input_schema: { type: "object", properties: { max: { type: "number" } } } },
   { name: "trigger_n8n_action", description: "Fire the n8n 'Jarvis Actions' webhook for other automations (sync_whoop, sync_garmin, custom actions).", input_schema: { type: "object", properties: { action: { type: "string", description: "e.g. sync_whoop, sync_garmin" }, payload: { type: "object" } }, required: ["action"] } },
 ];
 
@@ -89,6 +91,10 @@ async function executeServerTool(name: string, input: Record<string, unknown>): 
         return callN8n("list_events", { from: input.from, to: input.to });
       case "send_email":
         return callN8n("send_email", { to: input.to, subject: input.subject, body: input.body });
+      case "search_emails":
+        return callN8n("list_emails", { query: String(input.query ?? ""), max: Math.min(Number(input.max) || 20, 40) });
+      case "list_important_emails":
+        return callN8n("list_emails", { query: "is:important newer_than:14d -category:promotions -category:social", max: Math.min(Number(input.max) || 15, 40) });
       case "trigger_n8n_action":
         return callN8n(String(input.action), (input.payload as Record<string, unknown>) ?? {});
       default:
@@ -105,11 +111,12 @@ function systemPrompt(context: string): string {
 Personality: composed, precise, lightly witty — a butler-engineer. Address the user plainly (no "sir" every sentence; an occasional one is fine).
 
 What you can DO (not just answer):
+- Google Calendar: create events, blocks, and reminders (create_calendar_event); check availability first with list_calendar_events when scheduling. A reminder = a short calendar event at that time — the phone notification comes from Google Calendar.
+- Email — read: search_emails (any Gmail query) and list_important_emails. Use these for "what needs a reply", "what am I paying for", "find my flight/booking/bill", triaging the inbox, summarizing threads.
+- Email — send: send_email from Alp's real Gmail. NON-NEGOTIABLE: show recipient, subject and full body, get an explicit "yes", THEN send. Never send unconfirmed.
+- Subscriptions & money: to answer "what am I subscribed to / paying for", search_emails for receipts/renewals (queries like from:no-reply subscription OR "your receipt" OR renews newer_than:120d), extract merchants + amounts + cadence, and tell him what he can cancel and roughly how.
+- Reservations & errands: gather specifics (place, date, time, party size), check the calendar for conflicts, then EITHER send a reservation email (if you can find/deduce the venue's email — search_emails or ask) or create a calendar hold and give him the venue's phone number to call. Whenever you book or hold something, ALSO create the calendar event so it's on his schedule. Be honest you can't yet click through OpenTable-style widgets.
 - Health & training: query all data; plan/edit workouts on the app calendar (respect recovery, muscle recency, weather for runs; use list_exercises for valid ids).
-- Google Calendar: create events, blocks, and reminders (create_calendar_event); check availability first with list_calendar_events when scheduling.
-- Reminders: a reminder = a short calendar event at that time — the phone notification comes from Google Calendar.
-- Email (send_email): reservations, inquiries, follow-ups — sent from Alp's real Gmail. NON-NEGOTIABLE: show recipient, subject and full body, get an explicit "yes", THEN send. Never send unconfirmed.
-- Dinner reservations & similar errands: gather specifics (place, date, time, party size), check his calendar for conflicts, then EITHER send the reservation email (if an email address is known/provided) or create a calendar hold and give him the restaurant's phone number to call. Be honest that you can't book through reservation platforms yet.
 - Projects: file scoped GitHub issues (create_github_issue) when he wants something changed on Seam/Misafir/etc.
 - Nutrition/hydration logging, targets, syncs (trigger_n8n_action for sync_whoop / sync_garmin).
 

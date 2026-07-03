@@ -5,8 +5,8 @@ import AppShell from "@/components/AppShell";
 import RegisterSW from "@/components/RegisterSW";
 
 export const metadata: Metadata = {
-  title: "JARVIS",
-  description: "Personal operations dashboard — health, training, nutrition, weather, projects, and an AI agent.",
+  title: "JARVIS — Life OS",
+  description: "Your AI life operating system — calendar, inbox, subscriptions, projects, fitness, and an agent that acts.",
   manifest: "/manifest.json",
   icons: {
     icon: "/icons/icon-192.png",

@@ -170,3 +170,41 @@ export interface WeatherBundle {
   daily: WeatherDay[];
   run_advice: string;
 }
+
+// ── Life / agent surfaces ───────────────────────────────────────────────────
+export interface CalEvent {
+  id: string;
+  title: string;
+  start: string;       // ISO
+  end: string | null;  // ISO
+  allDay: boolean;
+  location: string | null;
+  description: string | null;
+  link: string | null;
+  source: "google" | "workout" | "run";
+  color?: string;      // for workout/run overlays
+}
+
+export interface EmailMsg {
+  id: string;
+  threadId: string;
+  from: string;
+  fromName: string;
+  subject: string;
+  snippet: string;
+  date: string;        // ISO
+  unread: boolean;
+  important: boolean;
+  labels: string[];
+}
+
+export interface Subscription {
+  merchant: string;
+  amount: number | null;
+  currency: string;
+  cadence: "monthly" | "yearly" | "weekly" | "unknown";
+  lastSeen: string;    // ISO date
+  category: string;
+  cancelHint: string | null;
+  emailQuery: string;  // to find the source emails again
+}

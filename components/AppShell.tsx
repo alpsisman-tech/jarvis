@@ -5,8 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "@/lib/theme";
 import {
-  IconSun, IconHeart, IconDumbbell, IconBolt, IconApple, IconCode,
-  IconSliders, IconDots, IconSpark, IconX, type IconProps,
+  IconHome, IconCalendar, IconMail, IconWallet, IconActivity,
+  IconCode, IconSliders, IconDots, IconX, type IconProps,
 } from "./icons";
 
 interface NavItem {
@@ -16,31 +16,36 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { href: "/", label: "Today", icon: IconSun },
-  { href: "/health", label: "Health", icon: IconHeart },
-  { href: "/training", label: "Training", icon: IconDumbbell },
-  { href: "/runs", label: "Runs", icon: IconBolt },
-  { href: "/nutrition", label: "Nutrition", icon: IconApple },
+  { href: "/", label: "Home", icon: IconHome },
+  { href: "/calendar", label: "Calendar", icon: IconCalendar },
+  { href: "/inbox", label: "Inbox", icon: IconMail },
+  { href: "/money", label: "Money", icon: IconWallet },
+  { href: "/fitness", label: "Fitness", icon: IconActivity },
   { href: "/projects", label: "Projects", icon: IconCode },
-  { href: "/jarvis", label: "Jarvis", icon: IconSpark },
   { href: "/settings", label: "Settings", icon: IconSliders },
 ];
 
-// Bottom bar: Today · Health · [Jarvis FAB] · Training · More
-const TAB_LEFT = ["/", "/health"];
-const TAB_RIGHT = ["/training"];
-const SHEET_ITEMS = ["/runs", "/nutrition", "/projects", "/settings"];
+// Bottom bar: Home · Calendar · [Jarvis FAB] · Inbox · More
+const TAB_LEFT = ["/", "/calendar"];
+const TAB_RIGHT = ["/inbox"];
+const SHEET_ITEMS = ["/money", "/fitness", "/projects", "/settings"];
 
 export function ArcReactor({ size = 26 }: { size?: number }) {
   const { c } = useTheme();
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" style={{ filter: `drop-shadow(0 0 ${size / 3}px ${c.accent}66)` }}>
-      <circle cx="50" cy="50" r="44" fill="none" stroke={c.accent} strokeWidth="5" opacity="0.35" />
+    <svg width={size} height={size} viewBox="0 0 100 100" style={{ filter: `drop-shadow(0 0 ${size / 3}px ${c.glow})` }}>
+      <defs>
+        <linearGradient id="arcg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={c.accent} />
+          <stop offset="100%" stopColor={c.accent2} />
+        </linearGradient>
+      </defs>
+      <circle cx="50" cy="50" r="44" fill="none" stroke="url(#arcg)" strokeWidth="5" opacity="0.35" />
       <g style={{ transformOrigin: "50px 50px", animation: "spin-slow 14s linear infinite" }}>
-        <circle cx="50" cy="50" r="32" fill="none" stroke={c.accent} strokeWidth="7"
+        <circle cx="50" cy="50" r="32" fill="none" stroke="url(#arcg)" strokeWidth="7"
           strokeDasharray="14 9" strokeLinecap="round" />
       </g>
-      <circle cx="50" cy="50" r="15" fill={c.accent} style={{ animation: "pulse-glow 3s ease-in-out infinite" }} />
+      <circle cx="50" cy="50" r="15" fill="url(#arcg)" style={{ animation: "pulse-glow 3s ease-in-out infinite" }} />
     </svg>
   );
 }
@@ -52,7 +57,7 @@ function Logo() {
       <ArcReactor />
       <div>
         <div style={{ fontWeight: 800, fontSize: 16, letterSpacing: 3, color: c.text }}>JARVIS</div>
-        <div style={{ fontSize: 9.5, color: c.muted, letterSpacing: 2.5 }}>PERSONAL OPS</div>
+        <div style={{ fontSize: 9.5, color: c.muted, letterSpacing: 2.5 }}>LIFE OS</div>
       </div>
     </Link>
   );
@@ -64,13 +69,12 @@ function TabLink({ item, active, onClick }: { item: NavItem; active: boolean; on
   return (
     <Link href={item.href} onClick={onClick} className="pressable" style={{
       display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-      padding: "7px 14px", borderRadius: 15, minWidth: 58,
-      background: active ? c.accentSoft : "transparent",
+      padding: "7px 14px", borderRadius: 15, minWidth: 56,
       color: active ? c.accent : c.muted,
-      transition: "background 0.2s, color 0.2s",
+      transition: "color 0.2s",
     }}>
-      <Icon size={21} strokeWidth={active ? 2.1 : 1.8} />
-      <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, letterSpacing: 0.2 }}>{item.label}</span>
+      <Icon size={21} strokeWidth={active ? 2.2 : 1.8} />
+      <span style={{ fontSize: 10, fontWeight: active ? 750 : 500 }}>{item.label}</span>
     </Link>
   );
 }
@@ -89,26 +93,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     setTimeout(() => { setSheetOpen(false); setSheetClosing(false); }, 240);
   };
 
-  useEffect(() => {
-    // close the sheet when navigation happens through it
-    setSheetOpen(false);
-    setSheetClosing(false);
-  }, [pathname]);
+  useEffect(() => { setSheetOpen(false); setSheetClosing(false); }, [pathname]);
 
   const pageBg = isDark
-    ? `radial-gradient(ellipse 80% 50% at 50% -10%, rgba(57,135,229,0.09), transparent), ${c.bg}`
+    ? `radial-gradient(ellipse 90% 45% at 50% -8%, rgba(109,139,255,0.10), transparent 60%), ${c.bg}`
     : c.bg;
 
   const item = (href: string) => NAV.find((n) => n.href === href)!;
 
   return (
     <div className="shell" style={{ background: pageBg, color: c.text }}>
-      <div className="ambient ambient-a" style={{ background: isDark ? "rgba(57,135,229,0.13)" : "rgba(42,120,214,0.10)" }} />
-      <div className="ambient ambient-b" style={{ background: isDark ? "rgba(144,133,233,0.09)" : "rgba(74,58,167,0.07)" }} />
+      <div className="ambient ambient-a" style={{ background: isDark ? "rgba(109,139,255,0.14)" : "rgba(77,99,216,0.10)" }} />
+      <div className="ambient ambient-b" style={{ background: isDark ? "rgba(167,121,255,0.11)" : "rgba(139,92,246,0.08)" }} />
 
-      {/* ── Desktop sidebar ── */}
-      <aside className="sidebar" style={{ borderRight: `1px solid ${c.border}`, zIndex: 1, background: isDark ? "rgba(7,11,17,0.55)" : "rgba(252,252,251,0.6)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)" }}>
-        <div style={{ padding: "6px 12px 22px" }}><Logo /></div>
+      <aside className="sidebar" style={{ borderRight: `1px solid ${c.border}`, zIndex: 1, background: isDark ? "rgba(8,10,15,0.55)" : "rgba(255,255,255,0.6)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}>
+        <div style={{ padding: "6px 12px 20px" }}><Logo /></div>
         {NAV.map((n) => {
           const on = active(n.href);
           const Icon = n.icon;
@@ -119,26 +118,34 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               borderLeft: `2px solid ${on ? c.accent : "transparent"}`,
               fontWeight: on ? 650 : 500,
             }}>
-              <Icon size={18} strokeWidth={on ? 2 : 1.7} />
+              <Icon size={18} strokeWidth={on ? 2.1 : 1.7} />
               {n.label}
             </Link>
           );
         })}
+
+        <Link href="/jarvis" className="navlink pressable" style={{
+          marginTop: 8, background: c.accentGrad, color: "#fff", fontWeight: 700,
+          borderLeft: "2px solid transparent", boxShadow: `0 6px 20px ${c.glow}`,
+        }}>
+          <ArcReactor size={18} />
+          Ask Jarvis
+        </Link>
+
         <div style={{ flex: 1 }} />
         <button onClick={toggle} className="pressable" style={{
-          background: "transparent", border: `1px solid ${c.border}`, borderRadius: 10,
+          background: "transparent", border: `1px solid ${c.border}`, borderRadius: 11,
           color: c.text2, padding: "8px 12px", fontSize: 12.5, cursor: "pointer", fontFamily: "inherit",
         }}>
           {isDark ? "☀ Light mode" : "☾ Dark mode"}
         </button>
       </aside>
 
-      {/* ── Content ── */}
       <div style={{ flex: 1, minWidth: 0, zIndex: 1, display: "flex", flexDirection: "column" }}>
         <header className="mobilehead" style={{
           borderBottom: `1px solid ${c.border}`,
-          background: isDark ? "rgba(7,11,17,0.7)" : "rgba(252,252,251,0.75)",
-          backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+          background: isDark ? "rgba(8,10,15,0.72)" : "rgba(255,255,255,0.78)",
+          backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)",
         }}>
           <Logo />
           <Link href="/settings" aria-label="Settings" className="pressable" style={{
@@ -153,13 +160,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {/* ── Mobile tab bar with center Jarvis button ── */}
-      <nav className="tabbar" style={{ background: isDark ? "rgba(7,11,17,0.86)" : "rgba(246,247,249,0.9)", borderTop: `1px solid ${c.border}` }}>
+      <nav className="tabbar" style={{ background: isDark ? "rgba(8,10,15,0.88)" : "rgba(245,246,249,0.92)", borderTop: `1px solid ${c.border}` }}>
         {TAB_LEFT.map((h) => <TabLink key={h} item={item(h)} active={active(h)} />)}
 
         <Link href="/jarvis" aria-label="Jarvis" className="fab pressable" style={{
-          background: `linear-gradient(140deg, ${c.accent}, #164a8c)`,
-          boxShadow: `0 6px 22px ${c.accent}66, 0 0 0 5px ${isDark ? "rgba(7,11,17,0.9)" : "rgba(246,247,249,0.95)"}`,
+          background: c.accentGrad,
+          boxShadow: `0 6px 24px ${c.glow}, 0 0 0 5px ${isDark ? "rgba(8,10,15,0.92)" : "rgba(245,246,249,0.96)"}`,
           outline: active("/jarvis") ? `2px solid ${c.accent}` : "none",
         }}>
           <svg width="26" height="26" viewBox="0 0 100 100">
@@ -175,28 +181,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         <button onClick={() => (sheetOpen ? closeSheet() : setSheetOpen(true))} className="pressable" style={{
           display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-          padding: "7px 14px", borderRadius: 15, minWidth: 58, border: "none",
-          background: sheetActive && !sheetOpen ? c.accentSoft : "transparent",
+          padding: "7px 14px", borderRadius: 15, minWidth: 56, border: "none",
+          background: "transparent",
           color: sheetActive || sheetOpen ? c.accent : c.muted,
           cursor: "pointer", fontFamily: "inherit",
         }}>
           <IconDots size={21} />
-          <span style={{ fontSize: 10, fontWeight: sheetActive ? 700 : 500 }}>More</span>
+          <span style={{ fontSize: 10, fontWeight: sheetActive ? 750 : 500 }}>More</span>
         </button>
       </nav>
 
-      {/* ── More sheet (mobile) ── */}
       {sheetOpen && (
-        <div className="sheet-root" onClick={closeSheet} style={{ background: "rgba(0,0,0,0.45)", animation: sheetClosing ? "fade-out 0.24s both" : "fade-in 0.2s both" }}>
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="sheet"
-            style={{
-              background: isDark ? "#0d1420" : c.surface,
-              borderTop: `1px solid ${c.border}`,
-              animation: sheetClosing ? "sheet-down 0.24s ease-in both" : "sheet-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both",
-            }}
-          >
+        <div className="sheet-root" onClick={closeSheet} style={{ background: "rgba(0,0,0,0.5)", animation: sheetClosing ? "fade-out 0.24s both" : "fade-in 0.2s both" }}>
+          <div onClick={(e) => e.stopPropagation()} className="sheet" style={{
+            background: isDark ? "#0d0f16" : c.surface,
+            borderTop: `1px solid ${c.border}`,
+            animation: sheetClosing ? "sheet-down 0.24s ease-in both" : "sheet-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both",
+          }}>
             <div style={{ width: 40, height: 4, borderRadius: 2, background: c.axis, margin: "0 auto 16px" }} />
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.4, color: c.muted }}>MORE</span>
@@ -211,13 +212,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 const on = active(h);
                 return (
                   <Link key={h} href={h} className="pressable" style={{
-                    display: "flex", alignItems: "center", gap: 12, padding: "16px 16px",
+                    display: "flex", alignItems: "center", gap: 12, padding: "16px",
                     borderRadius: 16, background: on ? c.accentSoft : c.surface2,
                     color: on ? c.accent : c.text,
                     animation: `rise-in 0.35s ${0.05 + i * 0.05}s cubic-bezier(0.22,1,0.36,1) both`,
                   }}>
-                    <Icon size={21} color={on ? c.accent : c.accent} />
-                    <span style={{ fontSize: 14.5, fontWeight: 600 }}>{n.label}</span>
+                    <Icon size={21} color={c.accent} />
+                    <span style={{ fontSize: 14.5, fontWeight: 650 }}>{n.label}</span>
                   </Link>
                 );
               })}
@@ -225,7 +226,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <button onClick={toggle} className="pressable" style={{
               width: "100%", marginTop: 12, padding: "14px 16px", borderRadius: 16,
               background: "transparent", border: `1px solid ${c.border}`, color: c.text2,
-              fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+              fontSize: 13.5, fontWeight: 650, cursor: "pointer", fontFamily: "inherit",
               animation: "rise-in 0.35s 0.25s cubic-bezier(0.22,1,0.36,1) both",
             }}>
               {isDark ? "☀ Switch to light mode" : "☾ Switch to dark mode"}

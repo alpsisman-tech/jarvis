@@ -91,3 +91,54 @@ export const IconX = (p: IconProps) => (
     <path d="M6 6l12 12M18 6 6 18" />
   </Svg>
 );
+
+export const IconHome = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 11.5 12 4l8 7.5" />
+    <path d="M6 10v9.5h12V10" />
+    <path d="M10 19.5V14h4v5.5" />
+  </Svg>
+);
+
+export const IconCalendar = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+    <path d="M3.5 9.5h17M8 3.5v3M16 3.5v3" />
+    <path d="M7.5 13h2M11 13h2M14.5 13h2M7.5 16.5h2M11 16.5h2" />
+  </Svg>
+);
+
+export const IconMail = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="5.5" width="18" height="13" rx="2.5" />
+    <path d="M4 7l8 5.5L20 7" />
+  </Svg>
+);
+
+export const IconWallet = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="6" width="18" height="13" rx="2.6" />
+    <path d="M3 9.5h18" />
+    <circle cx="16.5" cy="14" r="1.1" fill="currentColor" stroke="none" />
+  </Svg>
+);
+
+export const IconActivity = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 12.5h4l2.5-6 4 12 2.5-6H21" />
+  </Svg>
+);
+
+export const IconSearch = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="11" cy="11" r="6.5" />
+    <path d="M16 16l4.5 4.5" />
+  </Svg>
+);
+
+export const IconReply = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M9 8 4 12.5 9 17" />
+    <path d="M4 12.5h9a6 6 0 0 1 6 6V19" />
+  </Svg>
+);
