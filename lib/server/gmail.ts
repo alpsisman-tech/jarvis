@@ -1,53 +1,71 @@
 import type { EmailMsg } from "../types";
 
-// Normalize a Gmail message (from the n8n Gmail node, "getAll" with metadata)
-// into our EmailMsg shape. The Gmail node returns varied shapes across
-// versions, so read defensively.
+// Normalize a message from the n8n Gmail node ("getAll", simple mode) into our
+// EmailMsg. That mode returns fields like: From/To/Subject (capitalized
+// strings), snippet, internalDate (ms), labels ([{id,name}]) — plus other
+// shapes across versions, so read every field defensively.
 export function normalizeGmail(raw: Record<string, unknown>): EmailMsg {
-  const headers = (raw.headers ?? raw.payload ?? {}) as Record<string, unknown>;
-  const h = (k: string): string => {
-    const direct = headers[k] ?? headers[k.toLowerCase()];
-    if (typeof direct === "string") return direct;
+  const pick = (...keys: string[]): unknown => {
+    for (const k of keys) {
+      if (raw[k] !== undefined && raw[k] !== null && raw[k] !== "") return raw[k];
+    }
     // payload.headers array form
     const arr = (raw.payload as { headers?: { name: string; value: string }[] })?.headers;
     if (Array.isArray(arr)) {
-      const found = arr.find((x) => x.name?.toLowerCase() === k.toLowerCase());
-      if (found) return found.value;
+      for (const k of keys) {
+        const found = arr.find((x) => x.name?.toLowerCase() === k.toLowerCase());
+        if (found?.value) return found.value;
+      }
     }
-    return "";
+    // nested headers object
+    const hdrs = raw.headers as Record<string, unknown> | undefined;
+    if (hdrs) for (const k of keys) { const v = hdrs[k] ?? hdrs[k.toLowerCase()]; if (v) return v; }
+    return undefined;
   };
-  // The Gmail node returns `from` either as a string or as
-  // { text, value: [{ address, name }] }.
+
+  // Sender: string "Name <addr>" or object { text, value:[{address,name}] }
+  const fromField = pick("From", "from");
   let fromRaw = "";
   let fromName = "";
-  const fromObj = raw.from as { text?: string; value?: { address?: string; name?: string }[] } | string | undefined;
-  if (fromObj && typeof fromObj === "object") {
-    const v = fromObj.value?.[0];
-    fromRaw = fromObj.text ?? v?.address ?? "";
-    fromName = (v?.name || "").trim() || (v?.address || "").split("@")[0];
+  if (fromField && typeof fromField === "object") {
+    const v = (fromField as { text?: string; value?: { address?: string; name?: string }[] });
+    const first = v.value?.[0];
+    fromRaw = v.text ?? first?.address ?? "";
+    fromName = (first?.name || "").trim() || (first?.address || "").split("@")[0];
   } else {
-    fromRaw = String(fromObj ?? h("From") ?? "");
-    const nameMatch = fromRaw.match(/^\s*"?([^"<]*?)"?\s*<?([^>]*)>?\s*$/);
-    fromName = (nameMatch?.[1] || "").trim() || fromRaw.split("@")[0];
+    fromRaw = String(fromField ?? "");
+    const nameMatch = fromRaw.match(/^\s*"?([^"<]*?)"?\s*<([^>]*)>\s*$/);
+    if (nameMatch) fromName = (nameMatch[1] || "").trim() || nameMatch[2].split("@")[0];
+    else fromName = fromRaw.includes("@") ? fromRaw.split("@")[0] : fromRaw;
   }
-  if (!fromName) fromName = "Unknown";
-  const labels = (raw.labelIds ?? raw.labels ?? []) as string[];
-  const labelArr = Array.isArray(labels) ? labels.map(String) : [];
-  const dateStr = String(raw.date ?? raw.internalDate ?? h("Date") ?? "");
-  let iso = dateStr;
-  const asNum = Number(raw.internalDate);
-  if (asNum > 0) iso = new Date(asNum).toISOString();
-  else { const d = new Date(dateStr); if (!isNaN(d.getTime())) iso = d.toISOString(); }
+  fromName = fromName.replace(/^["']|["']$/g, "").trim() || (fromRaw ? fromRaw : "Unknown");
+
+  // Labels: ["UNREAD"] or [{id,name}]
+  const labelsRaw = (raw.labels ?? raw.labelIds ?? []) as unknown[];
+  const labels = (Array.isArray(labelsRaw) ? labelsRaw : []).map((l) =>
+    typeof l === "string" ? l : String((l as { id?: string; name?: string })?.id ?? (l as { name?: string })?.name ?? ""),
+  ).filter(Boolean).map((s) => s.toUpperCase());
+
+  // Date
+  let iso = "";
+  const internal = Number(raw.internalDate);
+  if (internal > 0) iso = new Date(internal).toISOString();
+  else {
+    const ds = String(pick("Date", "date") ?? "");
+    const d = new Date(ds);
+    iso = isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+  }
+
   return {
     id: String(raw.id ?? raw.messageId ?? Math.random().toString(36).slice(2)),
     threadId: String(raw.threadId ?? raw.id ?? ""),
     from: fromRaw,
     fromName,
-    subject: String(raw.subject ?? h("Subject") ?? "(no subject)"),
-    snippet: String(raw.snippet ?? raw.text ?? "").slice(0, 240),
+    subject: String(pick("Subject", "subject") ?? "(no subject)"),
+    snippet: String(raw.snippet ?? raw.text ?? "").replace(/‌/g, "").trim().slice(0, 240),
     date: iso,
-    unread: labelArr.includes("UNREAD"),
-    important: labelArr.includes("IMPORTANT") || labelArr.includes("STARRED"),
-    labels: labelArr,
+    unread: labels.includes("UNREAD"),
+    important: labels.includes("IMPORTANT") || labels.includes("STARRED"),
+    labels,
   };
 }

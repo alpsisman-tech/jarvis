@@ -13,10 +13,10 @@ export async function GET(req: NextRequest) {
   // Build a Gmail search query for the requested view
   let query = q;
   if (!query) {
-    if (filter === "important") query = "is:important newer_than:14d -category:promotions -category:social";
-    else if (filter === "unread") query = "is:unread newer_than:7d";
-    else if (filter === "needsreply") query = "is:unread newer_than:14d -category:promotions -category:social -category:updates";
-    else query = "newer_than:7d";
+    if (filter === "important") query = "in:inbox is:important newer_than:21d -category:promotions -category:social";
+    else if (filter === "unread") query = "in:inbox is:unread newer_than:10d";
+    else if (filter === "needsreply") query = "in:inbox is:unread newer_than:21d -category:promotions -category:social -category:updates -category:forums";
+    else query = "in:inbox newer_than:7d";
   }
 
   const res = await callAction("list_emails", { query, max });
