@@ -4,18 +4,24 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useTheme } from "@/lib/theme";
 import { Card, PageTitle, RangePicker, StatTile, Chip } from "@/components/ui";
 import { Bars, LineChart, HBars } from "@/components/charts";
-import { getRuns } from "@/lib/store";
+import { getRuns, getWorkouts } from "@/lib/store";
 import { weeklyMileage, personalRecords, zoneTotals, paceTrend } from "@/lib/runsAnalytics";
-import { fmtPace, fmtShort, fmtDuration, fmtDay } from "@/lib/format";
-import type { RunActivity } from "@/lib/types";
+import { fmtPace, fmtShort, fmtDuration, fmtDay, todayISO, addDays } from "@/lib/format";
+import type { RunActivity, Workout } from "@/lib/types";
 
 export default function RunsPage() {
   const { c } = useTheme();
   const [days, setDays] = useState(90);
   const [runs, setRuns] = useState<RunActivity[]>([]);
+  const [coach, setCoach] = useState<Workout[]>([]);
   const [open, setOpen] = useState<string | null>(null);
 
   useEffect(() => { getRuns(days).then(setRuns); }, [days]);
+  useEffect(() => {
+    getWorkouts(todayISO(), addDays(todayISO(), 14)).then((ws) =>
+      setCoach(ws.filter((w) => w.type === "run" && w.status === "planned")),
+    );
+  }, []);
 
   const weeks = useMemo(() => weeklyMileage(runs), [runs]);
   const prs = useMemo(() => personalRecords(runs), [runs]);
@@ -41,6 +47,29 @@ export default function RunsPage() {
         sub="Garmin activities with pace, heart rate and split analysis"
         right={<RangePicker value={days} onChange={setDays} options={[{ label: "30d", days: 30 }, { label: "90d", days: 90 }, { label: "120d", days: 120 }]} />}
       />
+
+      {coach.length > 0 && (
+        <Card title="Coming up — coach plan" style={{ marginBottom: 14 }}>
+          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+            {coach.map((w) => {
+              const isToday = w.date === todayISO();
+              return (
+                <div key={w.id} style={{
+                  background: isToday ? c.accentSoft : c.surface2, borderRadius: 12,
+                  padding: "10px 14px", minWidth: 120, flexShrink: 0,
+                  border: `1px solid ${isToday ? c.accent + "55" : "transparent"}`,
+                }}>
+                  <div style={{ fontSize: 11, color: isToday ? c.accent : c.muted, fontWeight: isToday ? 700 : 500 }}>
+                    {isToday ? "TODAY" : fmtDay(w.date)}
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: c.text, margin: "2px 0" }}>{w.title}</div>
+                  {w.notes && <div style={{ fontSize: 10.5, color: c.muted }}>{w.notes}</div>}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       <div className="grid4" style={{ marginBottom: 14 }}>
         <StatTile label={`Distance (${days}d)`} value={`${totalKm.toFixed(0)} km`} sub={`${runs.length} runs`} />

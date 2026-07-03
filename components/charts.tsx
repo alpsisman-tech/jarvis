@@ -3,10 +3,25 @@
 // Hand-rolled SVG charts following the dataviz method: thin marks, recessive
 // grid, hover tooltips by default, text in ink tokens (never series color).
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTheme } from "@/lib/theme";
 
 export interface Pt { x: string; y: number }
+
+// Catmull-Rom → cubic bezier: smooth line through all points.
+function smoothPath(xs: number[], ys: number[]): string {
+  const n = xs.length;
+  if (n === 0) return "";
+  if (n < 3) return xs.map((x, i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(" ");
+  let d = `M${xs[0].toFixed(1)},${ys[0].toFixed(1)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = Math.max(0, i - 1), p3 = Math.min(n - 1, i + 2);
+    const c1x = xs[i] + (xs[i + 1] - xs[p0]) / 6, c1y = ys[i] + (ys[i + 1] - ys[p0]) / 6;
+    const c2x = xs[i + 1] - (xs[p3] - xs[i]) / 6, c2y = ys[i + 1] - (ys[p3] - ys[i]) / 6;
+    d += `C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${xs[i + 1].toFixed(1)},${ys[i + 1].toFixed(1)}`;
+  }
+  return d;
+}
 
 function niceTicks(min: number, max: number, n = 4): number[] {
   if (min === max) { min -= 1; max += 1; }
@@ -64,11 +79,12 @@ export function LineChart({
     return { ticks: niceTicks(lo, hi), lo, hi };
   }, [data, series2, yMin, yMax]);
 
+  const gid = useId().replace(/[^a-zA-Z0-9]/g, "");
   if (data.length === 0) return <Empty height={height} />;
 
   const px = (i: number) => PAD.l + (i / Math.max(1, data.length - 1)) * (W - PAD.l - PAD.r);
   const py = (v: number) => PAD.t + (1 - (v - lo) / (hi - lo)) * (H - PAD.t - PAD.b);
-  const path = (pts: Pt[]) => pts.map((d, i) => `${i === 0 ? "M" : "L"}${px(i).toFixed(1)},${py(d.y).toFixed(1)}`).join(" ");
+  const path = (pts: Pt[]) => smoothPath(pts.map((_, i) => px(i)), pts.map((d) => py(d.y)));
 
   const onMove = (e: React.MouseEvent) => {
     const rect = ref.current!.getBoundingClientRect();
@@ -103,8 +119,16 @@ export function LineChart({
           <text key={i} x={px(i)} y={H - 6} fontSize={11} fill={c.muted} textAnchor="middle">{xFmt(data[i].x)}</text>
         ))}
         {fill && (
-          <path d={`${path(data)} L${px(data.length - 1)},${py(lo)} L${px(0)},${py(lo)} Z`}
-            fill={color} opacity={0.10} />
+          <>
+            <defs>
+              <linearGradient id={`g${gid}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={color} stopOpacity={0.30} />
+                <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <path d={`${path(data)} L${px(data.length - 1)},${py(lo)} L${px(0)},${py(lo)} Z`}
+              fill={`url(#g${gid})`} />
+          </>
         )}
         {series2 && color2 && <path d={path(series2)} fill="none" stroke={color2} strokeWidth={2} strokeLinejoin="round" pathLength={1} strokeDasharray={1} className="draw-in" />}
         <path d={path(data)} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" pathLength={1} strokeDasharray={1} className="draw-in" />
@@ -301,8 +325,8 @@ export function Sparkline({ data, color, width = 120, height = 36 }: {
   if (data.length < 2) return null;
   const lo = Math.min(...data), hi = Math.max(...data);
   const px = (i: number) => (i / (data.length - 1)) * (width - 4) + 2;
-  const py = (v: number) => 2 + (1 - (hi === lo ? 0.5 : (v - lo) / (hi - lo))) * (height - 4);
-  const d = data.map((v, i) => `${i === 0 ? "M" : "L"}${px(i).toFixed(1)},${py(v).toFixed(1)}`).join(" ");
+  const py = (v: number) => 3 + (1 - (hi === lo ? 0.5 : (v - lo) / (hi - lo))) * (height - 6);
+  const d = smoothPath(data.map((_, i) => px(i)), data.map(py));
   return (
     <svg width={width} height={height} style={{ display: "block" }}>
       <path d={d} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round"

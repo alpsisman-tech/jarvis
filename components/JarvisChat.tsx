@@ -77,8 +77,45 @@ export default function JarvisChat({ tall = false, initialQuery }: { tall?: bool
   const [apiMessages, setApiMessages] = useState<ApiMsg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [listening, setListening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentInitial = useRef(false);
+  const recogRef = useRef<{ stop: () => void } | null>(null);
+
+  // Voice input via the Web Speech API (Chrome/Safari; hidden if unsupported)
+  const SpeechRec = typeof window !== "undefined"
+    ? ((window as unknown as Record<string, unknown>).SpeechRecognition ??
+       (window as unknown as Record<string, unknown>).webkitSpeechRecognition)
+    : undefined;
+
+  const toggleMic = () => {
+    if (listening) {
+      recogRef.current?.stop();
+      setListening(false);
+      return;
+    }
+    if (!SpeechRec) return;
+    const r = new (SpeechRec as new () => {
+      lang: string; interimResults: boolean; continuous: boolean;
+      onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+      onend: (() => void) | null; onerror: (() => void) | null;
+      start: () => void; stop: () => void;
+    })();
+    r.lang = navigator.language || "en-US";
+    r.interimResults = true;
+    r.continuous = false;
+    r.onresult = (e) => {
+      const t = Array.from(e.results as ArrayLike<ArrayLike<{ transcript: string }>>)
+        .map((res) => res[0]?.transcript ?? "")
+        .join("");
+      setInput(t);
+    };
+    r.onend = () => setListening(false);
+    r.onerror = () => setListening(false);
+    recogRef.current = r;
+    setListening(true);
+    r.start();
+  };
 
   useEffect(() => {
     if (initialQuery && !sentInitial.current) {
@@ -229,12 +266,23 @@ export default function JarvisChat({ tall = false, initialQuery }: { tall?: bool
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask Jarvis anything…"
+          placeholder={listening ? "Listening…" : "Ask Jarvis anything…"}
           style={{
-            flex: 1, background: c.surface2, border: `1px solid ${c.border}`, borderRadius: 12,
+            flex: 1, background: c.surface2, border: `1px solid ${listening ? c.accent : c.border}`, borderRadius: 12,
             padding: "10px 14px", fontSize: 13.5, color: c.text, outline: "none", fontFamily: "inherit",
+            transition: "border-color 0.2s",
           }}
         />
+        {!!SpeechRec && (
+          <button type="button" onClick={toggleMic} aria-label="Voice input" className="pressable" style={{
+            background: listening ? c.accent : c.surface2, color: listening ? "#fff" : c.text2,
+            border: `1px solid ${listening ? c.accent : c.border}`, borderRadius: 12,
+            padding: "0 13px", fontSize: 15, cursor: "pointer", fontFamily: "inherit",
+            animation: listening ? "pulse-glow 1.4s ease-in-out infinite" : "none",
+          }}>
+            🎙
+          </button>
+        )}
         <button type="submit" disabled={busy || !input.trim()} style={{
           background: `linear-gradient(135deg, ${c.accent}, #1c5cab)`, color: "#fff", border: "none", borderRadius: 12,
           padding: "0 18px", fontSize: 14, fontWeight: 700, cursor: "pointer",
