@@ -121,7 +121,9 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 3. Run history via direct login (best-effort) ─────────────────────
-  if (haveCreds) {
+  // Skip entirely when a shim is configured: the shim is the source of
+  // truth, and hitting Garmin SSO here only adds to its login rate limit.
+  if (haveCreds && !haveShim) {
     try {
       const { GarminConnect } = (await import("garmin-connect")) as unknown as {
         GarminConnect: new (a: { username: string; password: string }) => GC;
