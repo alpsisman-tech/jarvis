@@ -144,6 +144,17 @@ export async function syncWhoop(days = 14): Promise<{ recovery: number; sleep: n
     paged("/activity/workout", token, start),
   ]);
 
+  // WHOOP returns newest-first. Sort ascending so that when two records
+  // collapse onto the same local day, the upsert de-dupe's "last wins" keeps
+  // the NEWEST record — otherwise today's strain/calories freeze at a stale
+  // value from an older cycle.
+  const asc = (key: string) => (a: Record<string, unknown>, b: Record<string, unknown>) =>
+    String(a[key] ?? a.created_at ?? "").localeCompare(String(b[key] ?? b.created_at ?? ""));
+  recoveries.sort(asc("created_at"));
+  sleeps.sort(asc("end"));
+  cycles.sort(asc("start"));
+  whoopWorkouts.sort(asc("start"));
+
   const recRows = recoveries
     .filter((r) => (r as { score_state?: string }).score_state === "SCORED")
     .map((r) => {
