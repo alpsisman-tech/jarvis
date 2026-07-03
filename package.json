@@ -1,0 +1,25 @@
+{
+  "name": "jarvis",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "icons": "node scripts/gen-icons.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.95.2",
+    "next": "16.1.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@netlify/plugin-nextjs": "^5.15.9",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5"
+  }
+}
