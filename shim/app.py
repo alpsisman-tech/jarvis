@@ -1,97 +1,105 @@
-# JARVIS Garmin shim — tiny Flask service that talks to Garmin Connect via
-# garth, authenticating from a token generated ONCE (Garmin blocks logins from
-# most cloud IPs). Reuses the token an existing deployment already holds:
-# reads GARMIN_TOKEN_B64 (garth dumps() base64) or GARTH_TOKEN, or the token
-# directory GARMINTOKENS.
+# JARVIS Garmin shim — Flask service that reads Garmin using the "DI"
+# (Digital Identity) OAuth2 tokens the existing deployment already holds:
+# GARMIN_TOKEN_B64 = base64(JSON) with di_token / di_refresh_token /
+# di_client_id. We refresh the access token via Garmin's DI token endpoint
+# (NOT the throttled SSO login) and call connectapi with a bearer header.
 #
 # Endpoints (all except /health require the X-Shim-Secret header):
-#   GET /health                     — liveness + token status (no auth)
+#   GET /health                     — liveness + auth status (no auth)
 #   GET /garmin/activities?limit=60 — native Garmin activity list JSON
 #   GET /garmin/scheduled-runs      — upcoming coach/scheduled workouts
+#   GET /debug/token, /debug/refresh — secret-gated diagnostics
 
 import base64
 import json
 import os
+import time
 from datetime import date
 
+import requests
 from flask import Flask, jsonify, request
-import garth
 
 app = Flask(__name__)
 SHIM_SECRET = os.environ.get("GARMIN_SHIM_SECRET") or os.environ.get("SHIM_SECRET") or ""
-TOKENDIR = os.path.expanduser(os.environ.get("GARMINTOKENS") or "/app/tokens")
 
-_loaded = False
-_load_error = None
+CONNECTAPI = "https://connectapi.garmin.com"
+DIAUTH_TOKEN_URL = "https://diauth.garmin.com/di-oauth2-service/oauth/token"
+UA = "com.garmin.android.apps.connectmobile"
+
+_access_token = None
+_access_exp = 0.0
+_refresh_token = None  # rotates; keep the newest in memory
 
 
 def _b64(raw: str) -> bytes:
-    """Padding-tolerant base64 decode (env vars sometimes lose '=')."""
     raw = "".join(raw.split())
     return base64.b64decode(raw + "=" * (-len(raw) % 4))
 
 
-def _write_token_dir(data) -> None:
-    """Reconstruct garth's oauth1/oauth2 json files from a decoded blob."""
-    if isinstance(data, dict) and ("oauth1_token" in data or "oauth2" in data):
-        o1 = data.get("oauth1_token") or data.get("oauth1")
-        o2 = data.get("oauth2_token") or data.get("oauth2")
-    elif isinstance(data, (list, tuple)) and len(data) >= 2:
-        o1, o2 = data[0], data[1]
-    else:
-        raise RuntimeError(f"unrecognized token structure: {type(data).__name__}")
-    os.makedirs(TOKENDIR, exist_ok=True)
-    with open(os.path.join(TOKENDIR, "oauth1_token.json"), "w") as f:
-        json.dump(o1, f)
-    with open(os.path.join(TOKENDIR, "oauth2_token.json"), "w") as f:
-        json.dump(o2, f)
-
-
-def _ensure_client():
-    """Load the Garmin session once, from whatever token form we were given."""
-    global _loaded, _load_error
-    if _loaded:
-        return garth
-    errors = []
+def _creds():
+    """(di_token, di_refresh_token, di_client_id) from the env blob."""
     raw = (os.environ.get("GARMIN_TOKEN_B64") or os.environ.get("GARTH_TOKEN") or "").strip()
-
-    # Preferred: GARMIN_TOKEN_B64 is base64(JSON) → rebuild token dir → resume
-    if raw:
-        try:
-            data = json.loads(_b64(raw))
-            _write_token_dir(data)
-            garth.resume(TOKENDIR)
-            _loaded = True
-            return garth
-        except Exception as e:  # noqa: BLE001
-            errors.append(f"b64-json->resume: {e}")
-        # Maybe it's raw JSON (not base64)
-        try:
-            data = json.loads(raw)
-            _write_token_dir(data)
-            garth.resume(TOKENDIR)
-            _loaded = True
-            return garth
-        except Exception as e:  # noqa: BLE001
-            errors.append(f"json->resume: {e}")
-        # Maybe it's garth's own dumps() string
-        try:
-            garth.client.loads(raw)
-            _loaded = True
-            return garth
-        except Exception as e:  # noqa: BLE001
-            errors.append(f"garth.loads: {e}")
-
-    # Token files already present on disk (GARMINTOKENS mounted)
+    if not raw:
+        raise RuntimeError("GARMIN_TOKEN_B64 not set")
     try:
-        garth.resume(TOKENDIR)
-        _loaded = True
-        return garth
-    except Exception as e:  # noqa: BLE001
-        errors.append(f"resume({TOKENDIR}): {e}")
+        data = json.loads(_b64(raw))
+    except Exception:
+        data = json.loads(raw)  # maybe stored as plain JSON
+    return data.get("di_token"), data.get("di_refresh_token"), data.get("di_client_id")
 
-    _load_error = " | ".join(errors) or "no token available"
-    raise RuntimeError(_load_error)
+
+def _refresh():
+    global _access_token, _access_exp, _refresh_token
+    di_token, di_refresh, di_client = _creds()
+    rt = _refresh_token or di_refresh
+    resp = requests.post(
+        DIAUTH_TOKEN_URL,
+        data={"grant_type": "refresh_token", "refresh_token": rt, "client_id": di_client},
+        headers={"User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    j = resp.json()
+    _access_token = j["access_token"]
+    _access_exp = time.time() + float(j.get("expires_in", 3500)) - 60
+    if j.get("refresh_token"):
+        _refresh_token = j["refresh_token"]
+    return _access_token
+
+
+def _token():
+    if _access_token and time.time() < _access_exp:
+        return _access_token
+    # Try the stored access token directly first (cheap; skips refresh if valid)
+    di_token, _, _ = _creds()
+    return _refresh() if not di_token else _try_stored_or_refresh(di_token)
+
+
+def _try_stored_or_refresh(di_token):
+    global _access_token, _access_exp
+    # Probe the stored token; if it 401s it's expired → refresh
+    r = requests.get(
+        f"{CONNECTAPI}/userprofile-service/userprofile",
+        headers={"Authorization": f"Bearer {di_token}", "User-Agent": UA, "Accept": "application/json"},
+        timeout=15,
+    )
+    if r.status_code == 200:
+        _access_token = di_token
+        _access_exp = time.time() + 300  # unknown expiry; re-check soon
+        return di_token
+    return _refresh()
+
+
+def _api(path, params=None):
+    t = _token()
+    headers = {"Authorization": f"Bearer {t}", "User-Agent": UA, "Accept": "application/json", "DI-Backend": "connectapi.garmin.com"}
+    r = requests.get(CONNECTAPI + path, params=params, headers=headers, timeout=25)
+    if r.status_code == 401:
+        t = _refresh()
+        headers["Authorization"] = f"Bearer {t}"
+        r = requests.get(CONNECTAPI + path, params=params, headers=headers, timeout=25)
+    r.raise_for_status()
+    return r.json()
 
 
 def _auth_ok():
@@ -101,37 +109,10 @@ def _auth_ok():
 @app.get("/health")
 def health():
     try:
-        _ensure_client()
-        return jsonify({"ok": True, "token_loaded": True})
-    except Exception:  # noqa: BLE001
-        return jsonify({"ok": False, "token_loaded": False, "error": _load_error}), 200
-
-
-# Structure of the token blob (keys/types only, never values) — for debugging
-# the token format without leaking the secret. Requires the shim secret.
-@app.get("/debug/token")
-def debug_token():
-    if not _auth_ok():
-        return jsonify({"error": "unauthorized"}), 401
-    raw = (os.environ.get("GARMIN_TOKEN_B64") or os.environ.get("GARTH_TOKEN") or "").strip()
-    info = {"raw_len": len(raw), "raw_head": raw[:8]}
-    try:
-        dec = _b64(raw)
-        info["b64_decoded_len"] = len(dec)
-        try:
-            j = json.loads(dec)
-            info["json_type"] = type(j).__name__
-            if isinstance(j, dict):
-                info["keys"] = list(j.keys())
-            elif isinstance(j, list):
-                info["list_len"] = len(j)
-                info["item_types"] = [type(x).__name__ for x in j[:4]]
-        except Exception as e:  # noqa: BLE001
-            info["decoded_head"] = dec[:60].decode("utf-8", "replace")
-            info["json_error"] = str(e)
+        _token()
+        return jsonify({"ok": True, "authenticated": True})
     except Exception as e:  # noqa: BLE001
-        info["b64_error"] = str(e)
-    return jsonify(info)
+        return jsonify({"ok": False, "authenticated": False, "error": str(e)[:300]}), 200
 
 
 @app.get("/garmin/activities")
@@ -143,13 +124,10 @@ def activities():
     except ValueError:
         limit = 60
     try:
-        acts = _ensure_client().connectapi(
-            "/activitylist-service/activities/search/activities",
-            params={"start": 0, "limit": limit},
-        )
+        acts = _api("/activitylist-service/activities/search/activities", {"start": 0, "limit": limit})
         return jsonify({"activities": acts or []})
     except Exception as e:  # noqa: BLE001
-        return jsonify({"error": str(e)}), 502
+        return jsonify({"error": str(e)[:300]}), 502
 
 
 @app.get("/garmin/scheduled-runs")
@@ -159,11 +137,10 @@ def scheduled_runs():
     today = date.today()
     runs = []
     try:
-        client = _ensure_client()
         for off in (0, 1):
             y = today.year + (today.month - 1 + off) // 12
             m = (today.month - 1 + off) % 12  # calendar-service months are 0-based
-            cal = client.connectapi(f"/calendar-service/year/{y}/month/{m}") or {}
+            cal = _api(f"/calendar-service/year/{y}/month/{m}") or {}
             for it in cal.get("calendarItems", []):
                 if it.get("itemType") != "workout":
                     continue
@@ -181,7 +158,38 @@ def scheduled_runs():
         runs.sort(key=lambda r: r["date"])
         return jsonify({"runs": runs})
     except Exception as e:  # noqa: BLE001
-        return jsonify({"error": str(e)}), 502
+        return jsonify({"error": str(e)[:300]}), 502
+
+
+@app.get("/debug/token")
+def debug_token():
+    if not _auth_ok():
+        return jsonify({"error": "unauthorized"}), 401
+    raw = (os.environ.get("GARMIN_TOKEN_B64") or "").strip()
+    info = {"raw_len": len(raw)}
+    try:
+        j = json.loads(_b64(raw))
+        info["keys"] = list(j.keys()) if isinstance(j, dict) else type(j).__name__
+    except Exception as e:  # noqa: BLE001
+        info["error"] = str(e)[:200]
+    return jsonify(info)
+
+
+@app.get("/debug/refresh")
+def debug_refresh():
+    if not _auth_ok():
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        _, di_refresh, di_client = _creds()
+        resp = requests.post(
+            DIAUTH_TOKEN_URL,
+            data={"grant_type": "refresh_token", "refresh_token": _refresh_token or di_refresh, "client_id": di_client},
+            headers={"User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
+            timeout=20,
+        )
+        return jsonify({"status": resp.status_code, "body_head": resp.text[:300]})
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"error": str(e)[:300]}), 200
 
 
 if __name__ == "__main__":
