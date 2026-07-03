@@ -8,10 +8,16 @@ const API_BASE = "https://api.prod.whoop.com/developer/v2";
 
 export const WHOOP_SCOPES = "read:recovery read:sleep read:workout read:cycles read:profile offline";
 
+// Tolerate a trailing slash in APP_URL — a doubled slash in the redirect URI
+// makes WHOOP reject the authorize request.
+function appUrl(): string {
+  return (process.env.APP_URL ?? "").replace(/\/+$/, "");
+}
+
 export function whoopAuthUrl(state: string): string {
   const p = new URLSearchParams({
     client_id: process.env.WHOOP_CLIENT_ID ?? "",
-    redirect_uri: `${process.env.APP_URL}/api/whoop/callback`,
+    redirect_uri: `${appUrl()}/api/whoop/callback`,
     response_type: "code",
     scope: WHOOP_SCOPES,
     state,
@@ -30,7 +36,7 @@ export async function exchangeCode(code: string): Promise<TokenSet> {
       code,
       client_id: process.env.WHOOP_CLIENT_ID ?? "",
       client_secret: process.env.WHOOP_CLIENT_SECRET ?? "",
-      redirect_uri: `${process.env.APP_URL}/api/whoop/callback`,
+      redirect_uri: `${appUrl()}/api/whoop/callback`,
     }),
   });
   if (!res.ok) throw new Error(`whoop token exchange ${res.status}: ${await res.text()}`);
