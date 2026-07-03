@@ -5,12 +5,12 @@ import Link from "next/link";
 import { useTheme } from "@/lib/theme";
 import { Card, Chip, Btn, Empty } from "@/components/ui";
 import { Ring } from "@/components/charts";
-import { IconReply, IconCalendar, IconMail } from "@/components/icons";
+import { IconReply, IconMail } from "@/components/icons";
 import WeatherCard from "@/components/WeatherCard";
 import { getRecovery, getWorkouts, getNutrition, getHydration, logHydration, getSettings, getMode } from "@/lib/store";
 import { fetchCalendar, fetchInbox, fetchTrainingEvents } from "@/lib/life";
 import { syncNow } from "@/lib/autoSync";
-import { todayISO, addDays, uid, mondayOf } from "@/lib/format";
+import { todayISO, uid } from "@/lib/format";
 import type { RecoveryDay, CalEvent, EmailMsg } from "@/lib/types";
 
 function recColor(s: number, c: { good: string; warning: string; critical: string }) {
@@ -33,11 +33,13 @@ export default function HomePage() {
   const today = todayISO();
 
   const load = async () => {
-    const dayStart = `${today}T00:00:00`;
-    const dayEnd = `${today}T23:59:59`;
+    // RFC3339 with timezone — Google's Calendar API rejects offset-less times
+    const dayStart = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+    const dayEnd = new Date(new Date().setHours(23, 59, 59, 0)).toISOString();
+    const twoDays = new Date(Date.now() + 2 * 86400000).toISOString();
     const [r, cal, tr, inbox, nut, hyd] = await Promise.all([
-      getRecovery(1),
-      fetchCalendar(dayStart, addDays(today, 2) + "T00:00:00"),
+      getRecovery(2), // recovery is a morning metric — fall back to yesterday's
+      fetchCalendar(dayStart, twoDays),
       fetchTrainingEvents(dayStart, dayEnd, c.series),
       fetchInbox("important", "", 5),
       getNutrition(today, today),

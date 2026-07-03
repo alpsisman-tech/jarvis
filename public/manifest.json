@@ -1,11 +1,11 @@
 {
-  "name": "JARVIS — Personal Ops",
+  "name": "JARVIS — Life OS",
   "short_name": "JARVIS",
-  "description": "Health, training, nutrition, weather, projects — and an agent that acts on all of it.",
+  "description": "Calendar, inbox, money, fitness, projects — and an AI agent that acts on all of it.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0e14",
-  "theme_color": "#0a0e14",
+  "background_color": "#080a0f",
+  "theme_color": "#080a0f",
   "orientation": "portrait",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
@@ -13,7 +13,7 @@
   ],
   "shortcuts": [
     { "name": "Ask Jarvis", "url": "/jarvis", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Log food", "url": "/nutrition", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Training", "url": "/training", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+    { "name": "Calendar", "url": "/calendar", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Inbox", "url": "/inbox", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }

@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0e14",
+  themeColor: "#080a0f",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -30,7 +30,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body style={{ background: "#0a0e14" }}>
+      <body style={{ background: "#080a0f" }}>
         <ThemeProvider>
           <AppShell>{children}</AppShell>
         </ThemeProvider>

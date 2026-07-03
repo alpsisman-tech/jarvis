@@ -24,7 +24,23 @@ export default function MoneyPage() {
   const [loading, setLoading] = useState(true);
   const [scanned, setScanned] = useState(0);
 
-  const load = () => {
+  // The scan hits Gmail + the LLM, so cache results for 30 min per session.
+  const CACHE_KEY = "jarvis-subs-cache";
+  const load = (force = false) => {
+    if (!force && typeof window !== "undefined") {
+      try {
+        const raw = sessionStorage.getItem(CACHE_KEY);
+        if (raw) {
+          const cached = JSON.parse(raw);
+          if (Date.now() - cached.at < 30 * 60_000) {
+            setSubs(cached.subs); setConfigured(cached.configured);
+            setScanned(cached.scanned); setError(cached.error ?? null);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch { /* rescan */ }
+    }
     setLoading(true);
     fetchSubscriptions().then((r) => {
       setSubs(r.subscriptions);
@@ -32,27 +48,37 @@ export default function MoneyPage() {
       setError(r.error ?? null);
       setScanned(r.scanned ?? 0);
       setLoading(false);
+      try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), subs: r.subscriptions, configured: r.configured, scanned: r.scanned ?? 0, error: r.error ?? null }));
+      } catch { /* ignore */ }
     });
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   const sorted = useMemo(() => [...subs].sort((a, b) => monthly(b) - monthly(a)), [subs]);
-  const totalMonthly = useMemo(() => subs.reduce((s, x) => s + monthly(x), 0), [subs]);
-  const currency = subs[0]?.currency ?? "USD";
+  // Currencies don't sum — total in the dominant one, count the rest separately
+  const currency = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of subs) counts.set(s.currency, (counts.get(s.currency) ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "USD";
+  }, [subs]);
+  const mainSubs = useMemo(() => subs.filter((s) => s.currency === currency), [subs, currency]);
+  const otherCount = subs.length - mainSubs.length;
+  const totalMonthly = useMemo(() => mainSubs.reduce((s, x) => s + monthly(x), 0), [mainSubs]);
   const sym = SYM[currency] ?? currency + " ";
 
   const byCategory = useMemo(() => {
     const m = new Map<string, number>();
-    for (const s of subs) m.set(s.category, (m.get(s.category) ?? 0) + monthly(s));
+    for (const s of mainSubs) m.set(s.category, (m.get(s.category) ?? 0) + monthly(s));
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
-  }, [subs]);
+  }, [mainSubs]);
 
   return (
     <div>
       <PageTitle
         title="Money"
         sub="What you're paying for — found by scanning your receipts"
-        right={<Btn variant="ghost" onClick={load} disabled={loading}>{loading ? "Scanning…" : "↻ Rescan"}</Btn>}
+        right={<Btn variant="ghost" onClick={() => load(true)} disabled={loading}>{loading ? "Scanning…" : "↻ Rescan"}</Btn>}
       />
 
       {!configured ? (
@@ -64,7 +90,8 @@ export default function MoneyPage() {
       ) : (
         <>
           <div className="grid3" style={{ marginBottom: 14 }}>
-            <StatTile label="Monthly total" value={`${sym}${totalMonthly.toFixed(2)}`} sub={`across ${subs.length} subscriptions`} accent={c.accent} />
+            <StatTile label="Monthly total" value={`${sym}${totalMonthly.toFixed(2)}`}
+              sub={`${mainSubs.length} in ${currency}${otherCount > 0 ? ` · +${otherCount} in other currencies` : ""}`} accent={c.accent} />
             <StatTile label="Yearly" value={`${sym}${(totalMonthly * 12).toFixed(0)}`} sub="projected annual spend" />
             <StatTile label="Priciest" value={sorted[0]?.merchant ?? "–"} sub={sorted[0]?.amount != null ? `${sym}${monthly(sorted[0]).toFixed(2)}/mo` : undefined} />
           </div>

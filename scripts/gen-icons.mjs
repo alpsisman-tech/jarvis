@@ -40,7 +40,7 @@ function encodePNG(pixels, w, h) {
 }
 
 const hex = (s) => [parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16), parseInt(s.slice(5, 7), 16)];
-const BG = hex("#0a0e14"), NAVY = hex("#101821"), BLUE = hex("#3987e5"), GLOW = hex("#9ec5f4");
+const BG = hex("#080a0f"), NAVY = hex("#12151d"), BLUE = hex("#6d8bff"), GLOW = hex("#c3b5ff");
 
 function draw(size) {
   const px = Buffer.alloc(size * size * 4);
