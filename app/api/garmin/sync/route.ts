@@ -17,17 +17,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "GARMIN_EMAIL / GARMIN_PASSWORD not configured" }, { status: 501 });
   }
 
-  // Loaded at runtime so the app builds without the optional dependency.
-  let GarminConnect: new (a: { username: string; password: string }) => {
-    login: () => Promise<void>;
-    getActivities: (start: number, limit: number) => Promise<Record<string, unknown>[]>;
-    getSteps: (d: Date) => Promise<number>;
-  };
+  let GarminConnect: typeof import("garmin-connect").GarminConnect;
   try {
-    GarminConnect = eval("require")("garmin-connect").GarminConnect;
-  } catch {
+    GarminConnect = (await import("garmin-connect")).GarminConnect;
+  } catch (e) {
     return NextResponse.json(
-      { error: "Optional dependency missing — run `npm i garmin-connect` on the server, or use /api/garmin/ingest via n8n instead." },
+      { error: `garmin-connect could not load (${String(e)}) — alternatively push data via /api/garmin/ingest.` },
       { status: 501 },
     );
   }
