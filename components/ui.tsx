@@ -81,7 +81,7 @@ export function Btn({ children, onClick, variant = "primary", disabled, type, st
     danger: { background: "transparent", color: c.critical, border: `1px solid ${c.critical}44` },
   };
   return (
-    <button type={type ?? "button"} onClick={onClick} disabled={disabled} style={{ ...base, ...variants[variant], ...style }}>
+    <button type={type ?? "button"} onClick={onClick} disabled={disabled} className="pressable" style={{ ...base, ...variants[variant], ...style }}>
       {children}
     </button>
   );

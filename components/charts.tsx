@@ -3,7 +3,7 @@
 // Hand-rolled SVG charts following the dataviz method: thin marks, recessive
 // grid, hover tooltips by default, text in ink tokens (never series color).
 
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "@/lib/theme";
 
 export interface Pt { x: string; y: number }
@@ -106,8 +106,8 @@ export function LineChart({
           <path d={`${path(data)} L${px(data.length - 1)},${py(lo)} L${px(0)},${py(lo)} Z`}
             fill={color} opacity={0.10} />
         )}
-        {series2 && color2 && <path d={path(series2)} fill="none" stroke={color2} strokeWidth={2} strokeLinejoin="round" />}
-        <path d={path(data)} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />
+        {series2 && color2 && <path d={path(series2)} fill="none" stroke={color2} strokeWidth={2} strokeLinejoin="round" pathLength={1} strokeDasharray={1} className="draw-in" />}
+        <path d={path(data)} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" pathLength={1} strokeDasharray={1} className="draw-in" />
         {hoverI !== null && (
           <g>
             <line x1={px(hoverI)} x2={px(hoverI)} y1={PAD.t} y2={H - PAD.b} stroke={c.axis} strokeWidth={1} />
@@ -265,6 +265,11 @@ export function Ring({
   label: string; sub?: string; fmt?: (v: number) => string;
 }) {
   const { c } = useTheme();
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setArmed(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
   const r = size / 2 - 8;
   const circ = 2 * Math.PI * r;
   const frac = Math.max(0, Math.min(1, max === 0 ? 0 : value / max));
@@ -274,7 +279,8 @@ export function Ring({
         <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
           <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={c.grid} strokeWidth={8} />
           <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={8}
-            strokeDasharray={`${circ * frac} ${circ}`} strokeLinecap="round" />
+            strokeDasharray={`${armed ? circ * frac : 0} ${circ}`} strokeLinecap="round"
+            style={{ transition: "stroke-dasharray 0.9s cubic-bezier(0.22, 1, 0.36, 1)" }} />
         </svg>
         <div style={{
           position: "absolute", inset: 0, display: "flex", flexDirection: "column",
@@ -299,8 +305,9 @@ export function Sparkline({ data, color, width = 120, height = 36 }: {
   const d = data.map((v, i) => `${i === 0 ? "M" : "L"}${px(i).toFixed(1)},${py(v).toFixed(1)}`).join(" ");
   return (
     <svg width={width} height={height} style={{ display: "block" }}>
-      <path d={d} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />
-      <circle cx={px(data.length - 1)} cy={py(data[data.length - 1])} r={3} fill={color} />
+      <path d={d} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round"
+        pathLength={1} strokeDasharray={1} className="draw-in" />
+      <circle cx={px(data.length - 1)} cy={py(data[data.length - 1])} r={3} fill={color} className="fade-in-late" />
     </svg>
   );
 }

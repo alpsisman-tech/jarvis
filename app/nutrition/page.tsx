@@ -95,9 +95,9 @@ export default function NutritionPage() {
         <Card title="Log food">
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
             {QUICK_FOODS.map((f) => (
-              <button key={f[0]} onClick={() => quickAdd(f)} style={{
+              <button key={f[0]} onClick={() => quickAdd(f)} className="pressable" style={{
                 background: c.surface2, color: c.text2, border: `1px solid ${c.border}`,
-                borderRadius: 999, padding: "6px 12px", fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+                borderRadius: 999, padding: "8px 13px", fontSize: 12, cursor: "pointer", fontFamily: "inherit",
               }}>
                 + {f[0]} <span style={{ color: c.muted }}>({f[2]} kcal)</span>
               </button>

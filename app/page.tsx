@@ -201,8 +201,8 @@ export default function TodayPage() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {["Should I push hard today or recover?", "Plan next week around my recovery", "Summarise my week in one paragraph"].map((q) => (
-              <Link key={q} href={`/jarvis?q=${encodeURIComponent(q)}`} style={{
-                background: c.surface2, borderRadius: 10, padding: "9px 12px",
+              <Link key={q} href={`/jarvis?q=${encodeURIComponent(q)}`} className="pressable" style={{
+                background: c.surface2, borderRadius: 12, padding: "11px 13px",
                 fontSize: 12.5, color: c.text2, border: `1px solid ${c.border}`,
               }}>
                 ✦ {q}

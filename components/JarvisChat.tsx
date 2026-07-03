@@ -182,9 +182,9 @@ export default function JarvisChat({ tall = false, initialQuery }: { tall?: bool
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
               {SUGGESTIONS.map((s) => (
-                <button key={s} onClick={() => send(s)} style={{
+                <button key={s} onClick={() => send(s)} className="pressable" style={{
                   background: c.surface2, color: c.text2, border: `1px solid ${c.border}`,
-                  borderRadius: 999, padding: "6px 12px", fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+                  borderRadius: 999, padding: "8px 13px", fontSize: 12, cursor: "pointer", fontFamily: "inherit",
                 }}>
                   {s}
                 </button>
@@ -195,14 +195,14 @@ export default function JarvisChat({ tall = false, initialQuery }: { tall?: bool
         {items.map((m, i) => {
           if (m.kind === "tool") {
             return (
-              <div key={i} style={{ alignSelf: "flex-start", fontSize: 11.5, color: c.muted, display: "flex", alignItems: "center", gap: 6, paddingLeft: 6 }}>
+              <div key={i} className="bubble-in" style={{ alignSelf: "flex-start", fontSize: 11.5, color: c.muted, display: "flex", alignItems: "center", gap: 6, paddingLeft: 6 }}>
                 <span style={{ color: c.accent }}>✦</span> {m.text}…
               </div>
             );
           }
           const isUser = m.kind === "user";
           return (
-            <div key={i} style={{
+            <div key={i} className="bubble-in" style={{
               alignSelf: isUser ? "flex-end" : "flex-start",
               maxWidth: "85%",
               background: isUser ? c.accent : m.kind === "error" ? `${c.critical}22` : c.surface2,

@@ -89,9 +89,10 @@ export default function RunsPage() {
             <div key={r.id}>
               <button
                 onClick={() => setOpen(open === r.id ? null : r.id)}
+                className="pressable"
                 style={{
                   width: "100%", textAlign: "left", background: c.surface2, border: "none",
-                  borderRadius: 12, padding: "10px 14px", cursor: "pointer", fontFamily: "inherit",
+                  borderRadius: 12, padding: "12px 14px", cursor: "pointer", fontFamily: "inherit",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
